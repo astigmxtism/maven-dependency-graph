@@ -7,3 +7,7 @@ class GraphError(Exception):
 
 class ConfigError(GraphError):
     """Некорректная конфигурация пользователя."""
+
+
+class RepositoryError(GraphError):
+    """Репозиторий недоступен или содержит некорректные данные."""
