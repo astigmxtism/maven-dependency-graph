@@ -1,4 +1,4 @@
-"""Интерфейс командной строки этапа получения прямых зависимостей."""
+"""Интерфейс командной строки этапа построения графа зависимостей."""
 
 import argparse
 import sys
@@ -6,7 +6,8 @@ from pathlib import Path
 
 from maven_graph.config import DEFAULT_CONFIG, load_config
 from maven_graph.errors import GraphError
-from maven_graph.maven import MavenRepository
+from maven_graph.graph import DependencyGraph, build_graph
+from maven_graph.repositories import create_repository
 
 EXIT_SUCCESS = 0
 EXIT_ERROR = 2
@@ -26,21 +27,22 @@ def make_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def print_graph(graph: DependencyGraph) -> None:
+    """Показать все вершины и рёбра в порядке BFS."""
+    print("Порядок BFS: " + ", ".join(graph.adjacency))
+    for node, targets in graph.adjacency.items():
+        print(f"{node} -> {', '.join(targets) or '(нет зависимостей)'}")
+    print(f"Вершин: {len(graph.adjacency)}; рёбер: {graph.edge_count}")
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Вывести прямые зависимости или понятную ошибку."""
+    """Построить граф или показать понятную ошибку."""
     args = make_parser().parse_args(argv)
     try:
         settings = load_config(args.config)
-        if settings.test_mode:
-            raise GraphError("Файловый репозиторий будет доступен на этапе 3")
-        repository = MavenRepository(settings.repository)
-        dependencies = repository.direct_dependencies(settings.package)
-        print(f"Прямые зависимости {settings.package}:")
-        for dependency in dependencies:
-            optional = ", optional" if dependency.optional else ""
-            print(f"{dependency.coordinates} [{dependency.scope}{optional}]")
-        if not dependencies:
-            print("(нет зависимостей)")
+        repository = create_repository(settings)
+        graph = build_graph(settings.package, repository)
+        print_graph(graph)
     except GraphError as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return EXIT_ERROR

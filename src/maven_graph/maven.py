@@ -6,6 +6,7 @@ from xml.etree import ElementTree
 from maven_graph.config import validate_url
 from maven_graph.coordinates import Coordinates
 from maven_graph.errors import RepositoryError
+from maven_graph.graph import Link
 from maven_graph.http import fetch_bytes
 from maven_graph.models import (
     Declaration, Dependency, PomModel, parse_coordinates, resolve_dependency,
@@ -150,4 +151,12 @@ class MavenRepository:
         return tuple(
             resolve_dependency(item, properties, model.managed)
             for item in model.declarations.values()
+        )
+
+    def neighbors(self, package: str) -> tuple[Link, ...]:
+        """Вернуть обязательные compile/runtime-рёбра потребителя пакета."""
+        return tuple(
+            Link(str(dependency.coordinates), dependency.exclusions)
+            for dependency in self.direct_dependencies(package)
+            if dependency.is_runtime
         )

@@ -63,3 +63,20 @@ class ManagementTests(unittest.TestCase):
         repository = MemoryRepository({"example:app:1": text})
         with self.assertRaisesRegex(RepositoryError, "DTD"):
             repository.direct_dependencies("example:app:1")
+
+    def test_only_consumer_runtime_edges_are_followed(self) -> None:
+        """test/provided/system/optional не переходят к потребителю пакета."""
+        declarations = [
+            dependency_xml(scope, extra=f"<scope>{scope}</scope>")
+            for scope in ("compile", "runtime", "test", "provided", "system")
+        ]
+        declarations.append(
+            dependency_xml("optional", extra="<optional>true</optional>")
+        )
+        body = "<dependencies>" + "".join(declarations) + "</dependencies>"
+        repository = MemoryRepository({"example:app:1": make_pom(body)})
+        links = repository.neighbors("example:app:1")
+        self.assertEqual(
+            [link.target for link in links],
+            ["example:compile:1", "example:runtime:1"],
+        )
