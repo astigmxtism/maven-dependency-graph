@@ -112,3 +112,19 @@ class ConfigTests(unittest.TestCase):
         self.config.write_bytes(b"\xff\xfe\x00")
         with self.assertRaises(ConfigError):
             load_config(self.config)
+
+    def test_reverse_parameters(self) -> None:
+        """Проверяются флаг reverse, координаты цели и сочетание параметров."""
+        text = VALID_INI + "reverse = true\nreverse_target = org.demo:lib:1\n"
+        settings = self.load(text)
+        self.assertTrue(settings.reverse.enabled)
+        self.assertEqual(settings.reverse.target, "org.demo:lib:1")
+        invalid = (
+            "reverse = sometimes\n",
+            "reverse_target = org.demo:lib:1\n",
+            "reverse = true\nreverse_target = broken\n",
+        )
+        for extra in invalid:
+            with self.subTest(extra=extra):
+                with self.assertRaisesRegex(ConfigError, "reverse"):
+                    self.load(VALID_INI + extra)

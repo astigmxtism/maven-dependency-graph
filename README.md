@@ -85,6 +85,19 @@ Maven-граф включает обязательные compile/runtime-зав�
 
 Алгоритм и шесть воспроизводимых примеров: [этап 3](docs/stage-3.md).
 
+## Обратные зависимости
+
+```console
+py -3 run.py --config examples/reverse/diamond.ini
+py -3 run.py --config examples/reverse/httpclient.ini
+```
+
+Необязательные ключи INI: `reverse` (по умолчанию false),
+`reverse_target` (по умолчанию выбранный пакет).
+Поиск выполняется по всему тестовому репозиторию либо внутри
+Maven-графа, собранного от `package`. Алгоритм, границы поиска
+и примеры: [этап 4](docs/stage-4.md).
+
 ## Структура
 
 ```text

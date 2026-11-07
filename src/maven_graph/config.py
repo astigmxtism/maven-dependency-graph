@@ -1,7 +1,7 @@
 """Чтение строгой INI-конфигурации и проверка каждого параметра."""
 
 import configparser
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -10,7 +10,16 @@ from maven_graph.errors import ConfigError
 
 SECTION = "settings"
 REQUIRED_KEYS = {"package", "repository", "test_mode", "ascii_tree"}
+OPTIONAL_KEYS = {"reverse", "reverse_target"}
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config.ini"
+
+
+@dataclass(frozen=True)
+class ReverseSettings:
+    """Параметры обратного обхода в пределах известного графа."""
+
+    enabled: bool = False
+    target: str = ""
 
 
 @dataclass(frozen=True)
@@ -21,6 +30,7 @@ class Settings:
     repository: str
     test_mode: bool
     ascii_tree: bool
+    reverse: ReverseSettings = field(default_factory=ReverseSettings)
 
 
 def read_ini(path: Path) -> configparser.ConfigParser:
@@ -42,7 +52,7 @@ def validate_schema(parser: configparser.ConfigParser) -> None:
         raise ConfigError("INI: допустима только секция [settings]")
     keys = set(parser[SECTION])
     missing = REQUIRED_KEYS - keys
-    unknown = keys - REQUIRED_KEYS
+    unknown = keys - REQUIRED_KEYS - OPTIONAL_KEYS
     if missing:
         message = "INI: отсутствуют ключи " + ", ".join(sorted(missing))
         raise ConfigError(message)
@@ -51,10 +61,12 @@ def validate_schema(parser: configparser.ConfigParser) -> None:
         raise ConfigError(message)
 
 
-def read_boolean(section: configparser.SectionProxy, key: str) -> bool:
+def read_boolean(
+    section: configparser.SectionProxy, key: str, default: bool = False
+) -> bool:
     """Получить логический параметр с адресным сообщением об ошибке."""
     try:
-        return section.getboolean(key)
+        return section.getboolean(key, fallback=default)
     except ValueError as error:
         raise ConfigError(f"{key}: ожидается true или false") from error
 
@@ -107,4 +119,21 @@ def load_config(path: Path) -> Settings:
     repository = validate_repository(
         section["repository"].strip(), test_mode, path.resolve().parent
     )
-    return Settings(package, repository, test_mode, ascii_tree)
+    reverse = read_reverse(section, test_mode)
+    return Settings(package, repository, test_mode, ascii_tree, reverse)
+
+
+def read_reverse(
+    section: configparser.SectionProxy, test_mode: bool
+) -> ReverseSettings:
+    """Проверить режим и необязательную цель обратного поиска."""
+    enabled = read_boolean(section, "reverse")
+    target = section.get("reverse_target", "").strip()
+    if target and not enabled:
+        raise ConfigError("reverse_target: требуется reverse=true")
+    if target:
+        try:
+            validate_package(target, test_mode)
+        except ConfigError as error:
+            raise ConfigError(f"reverse_target: {error}") from error
+    return ReverseSettings(enabled, target)
