@@ -21,6 +21,7 @@ IGNORED_DIRS = {
 CODE_SUFFIXES = {".py", ".sh", ".bat"}
 SNAKE_CASE = re.compile(r"[a-z_][a-z0-9_]*\Z")
 CAMEL_CASE = re.compile(r"[A-Z][A-Za-z0-9]*\Z")
+CONSTANT_CASE = re.compile(r"[A-Z_][A-Z0-9_]*\Z")
 UNITTEST_HOOKS = {"setUp", "tearDown", "setUpClass", "tearDownClass"}
 
 
@@ -95,6 +96,29 @@ def check_ast(tree: ast.Module) -> list[str]:
     return errors
 
 
+def identifier_name(node: ast.AST) -> str | None:
+    """Получить имя объявляемой переменной, параметра или исключения."""
+    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+        return node.id
+    if isinstance(node, ast.arg):
+        return node.arg
+    if isinstance(node, ast.ExceptHandler):
+        return node.name
+    return None
+
+
+def check_identifiers(tree: ast.Module) -> list[str]:
+    """Проверить snake_case переменных и UPPER_CASE констант."""
+    errors = []
+    for node in ast.walk(tree):
+        name = identifier_name(node)
+        if name is None:
+            continue
+        if not SNAKE_CASE.fullmatch(name) and not CONSTANT_CASE.fullmatch(name):
+            errors.append(f"строка {node.lineno}: имя {name} нарушает PEP 8")
+    return errors
+
+
 def check_lines(path: Path, text: str) -> list[str]:
     """Проверить число строк файла и длину строк исходного кода."""
     lines = text.splitlines()
@@ -115,7 +139,11 @@ def check_file(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8-sig")
     errors = check_lines(path, text)
     if path.suffix == ".py":
-        errors.extend(check_ast(ast.parse(text, filename=str(path))))
+        tree = ast.parse(text, filename=str(path))
+        errors.extend(check_ast(tree))
+        errors.extend(check_identifiers(tree))
+        if not SNAKE_CASE.fullmatch(path.stem):
+            errors.append("имя модуля нарушает PEP 8")
         with path.open("rb") as stream:
             for token in tokenize.tokenize(stream.readline):
                 if token.type == tokenize.COMMENT:

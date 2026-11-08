@@ -11,3 +11,7 @@ class ConfigError(GraphError):
 
 class RepositoryError(GraphError):
     """Репозиторий недоступен или содержит некорректные данные."""
+
+
+class VisualizationError(GraphError):
+    """Не удалось сохранить, отрисовать или открыть диаграмму."""

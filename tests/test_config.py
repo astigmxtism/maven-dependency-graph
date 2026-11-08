@@ -128,3 +128,22 @@ class ConfigTests(unittest.TestCase):
             with self.subTest(extra=extra):
                 with self.assertRaisesRegex(ConfigError, "reverse"):
                     self.load(VALID_INI + extra)
+
+    def test_ambiguous_url_characters_are_rejected(self) -> None:
+        """Пустые query/fragment и управляющие символы не портят Maven-путь."""
+        addresses = (
+            "https://host/?", "https://host/#", "https://host\\path",
+            "https://host/\0", "https://user:password@host/",
+        )
+        for address in addresses:
+            with self.subTest(address=address):
+                with self.assertRaisesRegex(ConfigError, "repository"):
+                    self.load(VALID_INI.replace(REPOSITORY_URL, address))
+
+    def test_invalid_test_repository_path(self) -> None:
+        """Недопустимый системный путь преобразуется в ошибку параметра."""
+        text = VALID_INI.replace("junit:junit:4.13.2", "A")
+        text = text.replace("test_mode = false", "test_mode = true")
+        text = text.replace(REPOSITORY_URL, "bad\0path")
+        with self.assertRaisesRegex(ConfigError, "repository"):
+            self.load(text)
